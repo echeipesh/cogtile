@@ -8,14 +8,14 @@ case class LoggingRangeReader(rr: RangeReader) extends RangeReader {
     def totalLength: Long = rr.totalLength
 
     override def readRange(start: Long, length: Int): Array[Byte] = {
-        //println(s"RangeReader: ${humanReadableByteCount(length)} at $start")
+        println(s"RangeReader: ${humanReadableByteCount(length)} at $start")
         rr.readRange(start, length)
     }
 
     protected def readClippedRange(start: Long, length: Int): Array[Byte] = ???
 
     override def readAll(): Array[Byte] = {
-        //println("RangeReader: ALL")
+        println("RangeReader: ALL")
         rr.readAll()
     }
 }

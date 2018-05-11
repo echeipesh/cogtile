@@ -1,6 +1,7 @@
 package com.azavea.cogtile
 
 import geotrellis.vector._
+import geotrellis.util._
 import geotrellis.raster._
 import geotrellis.raster.render._
 import geotrellis.raster.render.ColorRamps.Viridis
@@ -15,10 +16,11 @@ import geotrellis.spark.io.http.util.HttpRangeReader
 import geotrellis.hack.GTHack.closestTiffOverview
 import java.nio.file._
 import java.net.URI
-
+import scala.collection.concurrent._
 
 object CogView {
-
+  val headers = TrieMap.empty[URI, Array[Byte]]
+  
   private val TmsLevels: Array[LayoutDefinition] = {
     val scheme = ZoomedLayoutScheme(WebMercator, 256)
     for (zoom <- 0 to 64) yield scheme.levelForZoom(zoom).layout
@@ -35,9 +37,13 @@ object CogView {
       case scheme =>
         None
     }
-  }.map(LoggingRangeReader(_))
-
-
+  }
+  .map(LoggingRangeReader(_))
+  .map{ rr =>
+    val header = headers.getOrElseUpdate(uri, rr.readRange(0, 1<<18))
+    CacheRangeReader(rr, header)
+  }
+  
   def workingGeoTiffCrop[T <: CellGrid](tiff: GeoTiff[T], extent: Extent): Raster[T] = {
     val bounds = tiff.rasterExtent.gridBoundsFor(extent)
     val clipExtent = tiff.rasterExtent.extentFor(bounds)
@@ -47,6 +53,7 @@ object CogView {
 
   def fetchCroppedTile(uri: URI, z: Int, x: Int, y: Int, band: Int = 0): Option[Png] = {
     getRangeReader(uri).flatMap { rr => 
+      val byteReader = new StreamingByteReader(rr, 2048)
       val tiff = GeoTiffReader.readMultiband(rr, decompress = false, streaming = true)      
       val transform = Proj4Transform(tiff.crs, WebMercator)
       val inverseTransform = Proj4Transform(WebMercator, tiff.crs)

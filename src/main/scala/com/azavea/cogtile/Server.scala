@@ -9,7 +9,7 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.HttpMiddleware
 import org.http4s.server.middleware.{GZip, CORS, CORSConfig}
 import geotrellis.raster._
-
+import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import java.net.URI
@@ -40,10 +40,10 @@ object Server extends StreamApp[IO] with Http4sDsl[IO] {
     case GET -> Root =>
       Ok("testing - root")
     case GET -> Root / IntVar(zoom) / IntVar(x) / IntVar(y) :? UriQueryParamMatcher(uri) =>
-      Ok(CogView.fetchCroppedTile(uri, zoom, x, y) match {
+      Ok(blocking { CogView.fetchCroppedTile(uri, zoom, x, y) match {
         case Some(png) => png.bytes
         case None => emptyTile.bytes
-      })
+      }})
   }
 
   def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
