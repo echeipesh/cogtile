@@ -38,6 +38,13 @@ object CogView {
   }.map(LoggingRangeReader(_))
 
 
+  def workingGeoTiffCrop[T <: CellGrid](tiff: GeoTiff[T], extent: Extent): Raster[T] = {
+    val bounds = tiff.rasterExtent.gridBoundsFor(extent)
+    val clipExtent = tiff.rasterExtent.extentFor(bounds)
+    val clip = tiff.crop(List(bounds)).next._2
+    Raster(clip, clipExtent)
+  }
+
   def fetchCroppedTile(uri: URI, z: Int, x: Int, y: Int, band: Int = 0): Option[Png] = {
     getRangeReader(uri).flatMap { rr => 
       val tiff = GeoTiffReader.readMultiband(rr, decompress = false, streaming = true)      
@@ -54,10 +61,7 @@ object CogView {
         println(s"Selected overview: ${overview.tile.cols}x${overview.tile.rows}");
         // GT BUG: this crop will produce incorret raster
         //val raster = overview.crop(tiffTileRE.extent).raster
-        val bounds = overview.rasterExtent.gridBoundsFor(tiffTileRE.extent)
-        val clipExtent = overview.rasterExtent.extentFor(bounds)
-        val clip = overview.crop(List(bounds)).next._2
-        val raster = Raster(clip, clipExtent)
+        val raster = workingGeoTiffCrop(overview, tiffTileRE.extent)
         println(s"Raster: ${raster.extent} ${raster.cols}x${raster.rows}")
         val hist = raster.tile.bands(band).histogramDouble
         val png = raster.reproject(tmsTileRE, transform, inverseTransform).tile.band(band).renderPng(Viridis.toColorMap(hist))
